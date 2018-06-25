@@ -519,10 +519,13 @@ class ST_Overlap(BaseIntType):
 
 
 class ST_Percentage(BaseIntType):
+    """Percentage value like 42000 or '42.0%'
+
+    Either an integer literal representing 1000ths of a percent
+    (e.g. "42000"), or a floating point literal with a '%' suffix
+    (e.g. "42.0%).
     """
-    String value can be either an integer, representing 1000ths of a percent,
-    or a floating point literal with a '%' suffix.
-    """
+
     @classmethod
     def convert_from_xml(cls, str_value):
         if '%' in str_value:
@@ -559,6 +562,42 @@ class ST_PositiveCoordinate(XsdLong):
     @classmethod
     def validate(cls, value):
         cls.validate_int_in_range(value, 0, 27273042316900)
+
+
+class ST_PositiveFixedAngle(ST_Angle):
+    """Valid values for `a:lin@ang`.
+
+    60000ths of a degree rotation, constained to positive angles less than
+    360 degrees.
+    """
+
+    @classmethod
+    def convert_to_xml(cls, degrees):
+        """Convert signed angle float like -427.42 to int 60000 per degree.
+
+        Value is normalized to a positive value less than 360 degrees.
+        """
+        if degrees < 0.0:
+            degrees %= -360
+            degrees += 360
+        elif degrees > 0.0:
+            degrees %= 360
+
+        return str(int(round(degrees * cls.DEGREE_INCREMENTS)))
+
+
+class ST_PositiveFixedPercentage(ST_Percentage):
+    """Percentage value between 0 and 100% like 42000 or '42.0%'
+
+    Either an integer literal representing 1000ths of a percent
+    (e.g. "42000"), or a floating point literal with a '%' suffix
+    (e.g. "42.0%). Value is constrained to range of 0% to 100%. The source
+    value is a float between 0.0 and 1.0.
+    """
+
+    @classmethod
+    def validate(cls, value):
+        cls.validate_float_in_range(value, 0.0, 1.0)
 
 
 class ST_RelationshipId(XsdString):

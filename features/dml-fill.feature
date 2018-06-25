@@ -4,16 +4,30 @@ Feature: Control fill
   I need properties and methods on FillFormat
 
 
+  Scenario Outline: FillFormat type getters
+    Given <type> FillFormat object as fill
+     Then fill.type is <value>
+
+    Examples: Fill types
+      | type          | value               |
+      | an inheriting | None                |
+      | a no-fill     | MSO_FILL.BACKGROUND |
+      | a solid       | MSO_FILL.SOLID      |
+      | a picture     | MSO_FILL.PICTURE    |
+      | a gradient    | MSO_FILL.GRADIENT   |
+      | a patterned   | MSO_FILL.PATTERNED  |
+
+
   Scenario Outline: FillFormat type setters
     Given a FillFormat object as fill
      When I call fill.<type-setter>()
-     Then fill.type is MSO_FILL.<type-name>
+     Then fill.type is <value>
 
     Examples: Fill types
-      | type-setter | type-name  |
-      | background  | BACKGROUND |
-      | patterned   | PATTERNED  |
-      | solid       | SOLID      |
+      | type-setter | value               |
+      | background  | MSO_FILL.BACKGROUND |
+      | solid       | MSO_FILL.SOLID      |
+      | patterned   | MSO_FILL.PATTERNED  |
 
 
   Scenario: FillFormat.back_color
@@ -31,6 +45,11 @@ Feature: Control fill
       | type-setter |
       | patterned   |
       | solid       |
+
+
+  Scenario: FillFormat.gradient_stops
+    Given a gradient FillFormat object as fill
+     Then fill.gradient_stops is a _GradientStops object
 
 
   Scenario Outline: FillFormat.pattern getter

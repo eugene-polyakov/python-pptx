@@ -7,7 +7,8 @@ from __future__ import (
 )
 
 from pptx.enum.shapes import PP_PLACEHOLDER
-from pptx.oxml.ns import qn
+from pptx.oxml import parse_xml
+from pptx.oxml.ns import nsdecls, qn
 from pptx.oxml.simpletypes import (
     ST_Angle, ST_Coordinate, ST_Direction, ST_DrawingElementId, ST_LineWidth,
     ST_PlaceholderSize, ST_PositiveCoordinate, XsdBoolean, XsdString,
@@ -383,6 +384,30 @@ class CT_ShapeProperties(BaseOxmlElement):
         if not y_str_lst:
             return None
         return Emu(y_str_lst[0])
+
+    def _new_gradFill(self):
+        """Override default to add default gradient subtree."""
+        return parse_xml(
+            '<a:gradFill %s rotWithShape="1">\n'
+            '  <a:gsLst>\n'
+            '    <a:gs pos="0">\n'
+            '      <a:schemeClr val="accent1">\n'
+            '        <a:tint val="100000"/>\n'
+            '        <a:shade val="100000"/>\n'
+            '        <a:satMod val="130000"/>\n'
+            '      </a:schemeClr>\n'
+            '    </a:gs>\n'
+            '    <a:gs pos="100000">\n'
+            '      <a:schemeClr val="accent1">\n'
+            '        <a:tint val="50000"/>\n'
+            '        <a:shade val="100000"/>\n'
+            '        <a:satMod val="350000"/>\n'
+            '      </a:schemeClr>\n'
+            '    </a:gs>\n'
+            '  </a:gsLst>\n'
+            '  <a:lin scaled="0"/>\n'
+            '</a:gradFill>\n' % nsdecls('a')
+        )
 
 
 class CT_Transform2D(BaseOxmlElement):

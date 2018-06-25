@@ -1,20 +1,22 @@
 # encoding: utf-8
 
-"""
-DrawingML objects related to fill, FillFormat being the top-most.
-"""
+"""DrawingML objects related to fill."""
 
-from __future__ import absolute_import, print_function, unicode_literals
+from __future__ import (
+    absolute_import, division, print_function, unicode_literals
+)
 
-from ..enum.dml import MSO_FILL
-from ..oxml.dml.fill import (
+from collections import Sequence
+
+from pptx.dml.color import ColorFormat
+from pptx.enum.dml import MSO_FILL
+from pptx.oxml.dml.fill import (
     CT_BlipFillProperties, CT_GradientFillProperties, CT_GroupFillProperties,
     CT_NoFillProperties, CT_PatternFillProperties,
     CT_SolidColorFillProperties,
 )
+from pptx.shared import ElementProxy
 from pptx.util import lazyproperty
-
-from .color import ColorFormat
 
 
 class FillFormat(object):
@@ -49,6 +51,53 @@ class FillFormat(object):
         this fill.
         """
         return self._fill.fore_color
+
+    def gradient(self):
+        """Sets the fill type to gradient.
+
+        If the fill is not already a gradient, a default gradient is added.
+        The default gradient corresponds to the default in the built-in
+        PowerPoint "White" template. This gradient is linear at angle
+        90-degrees (upward), with two stops. The first stop is Accent-1 with
+        tint 100%, shade 100%, and satMod 130%. The second stop is Accent-1
+        with tint 50%, shade 100%, and satMod 350%.
+        """
+        gradFill = self._xPr.get_or_change_to_gradFill()
+        self._fill = _GradFill(gradFill)
+
+    @property
+    def gradient_angle(self):
+        """Angle in float degrees of line of a linear gradient.
+
+        Read/Write. May be |None|, indicating the angle should be inherited
+        from the style hierarchy. An angle of 0.0 corresponds to
+        a left-to-right gradient. Increasing angles represent clockwise
+        rotation of the line, for example 90.0 represents a top-to-bottom
+        gradient. Raises |TypeError| when the fill type is not
+        MSO_FILL_TYPE.GRADIENT. Raises |ValueError| for a non-linear gradient
+        (e.g. a radial gradient).
+        """
+        if self.type != MSO_FILL.GRADIENT:
+            raise TypeError('Fill is not of type MSO_FILL_TYPE.GRADIENT')
+        return self._fill.gradient_angle
+
+    @gradient_angle.setter
+    def gradient_angle(self, value):
+        if self.type != MSO_FILL.GRADIENT:
+            raise TypeError('Fill is not of type MSO_FILL_TYPE.GRADIENT')
+        self._fill.gradient_angle = value
+
+    @property
+    def gradient_stops(self):
+        """|GradientStops| object providing access to stops of this gradient.
+
+        Raises |TypeError| when fill is not gradient (call `fill.gradient()`
+        first). Each stop represents a color between which the gradient
+        smoothly transitions.
+        """
+        if self.type != MSO_FILL.GRADIENT:
+            raise TypeError('Fill is not of type MSO_FILL_TYPE.GRADIENT')
+        return self._fill.gradient_stops
 
     @classmethod
     def from_fill_parent(cls, eg_fillProperties_parent):
@@ -172,6 +221,41 @@ class _BlipFill(_Fill):
 
 class _GradFill(_Fill):
 
+    def __init__(self, gradFill):
+        self._element = self._gradFill = gradFill
+
+    @property
+    def gradient_angle(self):
+        """Angle in float degrees of line of a linear gradient.
+
+        Read/Write. May be |None|, indicating the angle is inherited from the
+        style hierarchy. An angle of 0.0 corresponds to a left-to-right
+        gradient. Increasing angles represent clockwise rotation of the line,
+        for example 90.0 represents a top-to-bottom gradient. Raises
+        |TypeError| when the fill type is not MSO_FILL_TYPE.GRADIENT. Raises
+        |ValueError| for a non-linear gradient (e.g. a radial gradient).
+        """
+        lin = self._gradFill.lin
+        if lin is None:
+            raise ValueError('not a linear gradient')
+        return lin.ang
+
+    @gradient_angle.setter
+    def gradient_angle(self, value):
+        lin = self._gradFill.lin
+        if lin is None:
+            raise ValueError('not a linear gradient')
+        lin.ang = value
+
+    @lazyproperty
+    def gradient_stops(self):
+        """|_GradientStops| object providing access to gradient colors.
+
+        Each stop represents a color between which the gradient smoothly
+        transitions.
+        """
+        return _GradientStops(self._gradFill.get_or_add_gsLst())
+
     @property
     def type(self):
         return MSO_FILL.GRADIENT
@@ -251,3 +335,61 @@ class _SolidFill(_Fill):
     @property
     def type(self):
         return MSO_FILL.SOLID
+
+
+class _GradientStops(Sequence):
+    """Collection of |GradientStop| objects defining gradient colors.
+
+    A gradient must have a minimum of two stops, but can have as many more
+    than that as required to achieve the desired effect (three is perhaps
+    most common). Stops are sequenced in the order they are transitioned
+    through.
+    """
+
+    def __init__(self, gsLst):
+        self._gsLst = gsLst
+
+    def __getitem__(self, idx):
+        return _GradientStop(self._gsLst[idx])
+
+    def __len__(self):
+        return len(self._gsLst)
+
+
+class _GradientStop(ElementProxy):
+    """Collection of |GradientStop| objects defining gradient colors.
+
+    A gradient must have a minimum of two stops, but can have as many more
+    than that as required to achieve the desired effect (three is perhaps
+    most common). Stops are sequenced in the order they are transitioned
+    through.
+    """
+
+    __slots__ = ('_gs', '_color')
+
+    def __init__(self, gs):
+        super(_GradientStop, self).__init__(gs)
+        self._gs = gs
+
+    @lazyproperty
+    def color(self):
+        """Return |ColorFormat| object controlling stop color."""
+        return ColorFormat.from_colorchoice_parent(self._gs)
+
+    @property
+    def position(self):
+        """Location of stop in gradient path as float between 0.0 and 1.0.
+
+        The value represents a percentage, where 0.0 (0%) represents the
+        start of the path and 1.0 (100%) represents the end of the path. For
+        a linear gradient, these would represent opposing extents of the
+        filled area.
+        """
+        return self._gs.pos
+
+    @position.setter
+    def position(self, value):
+        value = float(value)
+        if value < 0.0 or value > 1.0:
+            raise ValueError('value must be in range 0.0 to 1.0 inclusive')
+        self._gs.pos = value

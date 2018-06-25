@@ -9,9 +9,13 @@ from __future__ import absolute_import
 from pptx.enum.dml import MSO_PATTERN_TYPE
 from pptx.oxml import parse_xml
 from pptx.oxml.ns import nsdecls
-from pptx.oxml.simpletypes import ST_Percentage, ST_RelationshipId
+from pptx.oxml.simpletypes import (
+    ST_Percentage, ST_PositiveFixedAngle, ST_PositiveFixedPercentage,
+    ST_RelationshipId
+)
 from pptx.oxml.xmlchemy import (
-    BaseOxmlElement, Choice, OptionalAttribute, ZeroOrOne, ZeroOrOneChoice
+    BaseOxmlElement, Choice, OneOrMore, OptionalAttribute, RequiredAttribute,
+    ZeroOrOne, ZeroOrOneChoice
 )
 
 
@@ -40,9 +44,53 @@ class CT_BlipFillProperties(BaseOxmlElement):
 
 
 class CT_GradientFillProperties(BaseOxmlElement):
-    """
-    Custom element class for <a:gradFill> element.
-    """
+    """`a:gradFill` custom element class."""
+
+    _tag_seq = ('a:gsLst', 'a:lin', 'a:path', 'a:tileRect')
+    gsLst = ZeroOrOne('a:gsLst', successors=_tag_seq[1:])
+    lin = ZeroOrOne('a:lin', successors=_tag_seq[2:])
+    del _tag_seq
+
+    def _new_gsLst(self):
+        """Override default to add minimum subtree.
+
+        An `a:gsLst` element must have at least two `a:gs` children. These
+        are the default from the PowerPoint built-in "White" template.
+        """
+        return parse_xml(
+            '<a:gsLst %s>\n'
+            '  <a:gs pos="0">\n'
+            '    <a:schemeClr val="accent1">\n'
+            '      <a:tint val="100000"/>\n'
+            '      <a:shade val="100000"/>\n'
+            '      <a:satMod val="130000"/>\n'
+            '    </a:schemeClr>\n'
+            '  </a:gs>\n'
+            '  <a:gs pos="100000">\n'
+            '    <a:schemeClr val="accent1">\n'
+            '      <a:tint val="50000"/>\n'
+            '      <a:shade val="100000"/>\n'
+            '      <a:satMod val="350000"/>\n'
+            '    </a:schemeClr>\n'
+            '  </a:gs>\n'
+            '</a:gsLst>\n' % nsdecls('a')
+        )
+
+
+class CT_GradientStop(BaseOxmlElement):
+    """`a:gs` custom element class."""
+    eg_colorChoice = ZeroOrOneChoice((
+        Choice('a:scrgbClr'), Choice('a:srgbClr'), Choice('a:hslClr'),
+        Choice('a:sysClr'), Choice('a:schemeClr'), Choice('a:prstClr')),
+        successors=()
+    )
+    pos = RequiredAttribute('pos', ST_PositiveFixedPercentage)
+
+
+class CT_GradientStopList(BaseOxmlElement):
+    """`a:gsLst` custom element class."""
+
+    gs = OneOrMore('a:gs')
 
 
 class CT_GroupFillProperties(BaseOxmlElement):
@@ -51,10 +99,14 @@ class CT_GroupFillProperties(BaseOxmlElement):
     """
 
 
+class CT_LinearShadeProperties(BaseOxmlElement):
+    """`a:lin` custom element class"""
+
+    ang = OptionalAttribute('ang', ST_PositiveFixedAngle)
+
+
 class CT_NoFillProperties(BaseOxmlElement):
-    """
-    Custom element class for <a:NoFill> element.
-    """
+    """`a:noFill` custom element class"""
 
 
 class CT_PatternFillProperties(BaseOxmlElement):
