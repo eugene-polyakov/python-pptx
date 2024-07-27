@@ -439,7 +439,11 @@ class _RowCollection(Subshape):
         Returns new |_Row| instance.
         """
         new_row = copy.deepcopy(self._tbl.tr_lst[-1])  # copies last row element
-
+        
+        id_attrib = new_row.getchildren()[-1].getchildren()[0].getchildren()[0]
+        row_id = insertIndex if insertIndex != -1 else len(self)+1
+        id_attrib.set("val", str(int(id_attrib.get("val")) + row_id))
+        
         for tc in new_row.tc_lst:
             cell = _Cell(tc, new_row.tc_lst)
             cell.text = ''
